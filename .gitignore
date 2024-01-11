@@ -21,3 +21,6 @@
 
 # Go workspace file
 go.work
+
+# Ignore binaries created in bin/
+bin/
