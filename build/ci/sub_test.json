@@ -1,0 +1,18 @@
+[
+  {
+    "pubsubname": "self_test",
+    "topic": "io.prometheus.exporter.testing_self.80",
+    "route": {
+      "default": "http://localhost:18080/metrics",
+      "rules": []
+    }
+  },
+  {
+    "pubsubname": "ncsi_test",
+    "topic": "io.prometheus.exporter.testing_ncsi.80",
+    "route": {
+      "default": "http://www.msftconnecttest.com/connecttest.txt",
+      "rules": []
+    }
+  }
+]
