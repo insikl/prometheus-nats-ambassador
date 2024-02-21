@@ -16,5 +16,4 @@ Package: prometheus-nats-ambassador
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends},
 Depends: ${misc:Depends},
-         ${shlibs:Depends},
 Description: Ambassador microservice for Prometheus to use NATS2 message bus
