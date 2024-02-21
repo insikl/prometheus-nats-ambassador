@@ -1,0 +1,12 @@
+[Unit]
+Description=MATS ambassador microservice for Prometheus
+
+[Service]
+Restart=on-failure
+User=prometheus
+EnvironmentFile=/etc/default/prometheus-nats-ambassador
+ExecStart=/usr/bin/prometheus-nats-ambassador $CREDS $URLS $SUBS $LISTEN
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target

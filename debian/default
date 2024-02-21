@@ -1,0 +1,5 @@
+# Example configuration; update based on your system
+CREDS="-creds /nats/cred/file/user.creds"
+URLS="-urls nats://nats.example.com:4222"
+SUBS="-subs /sub/file/loc/subscriptions.json"
+LISTEN="-listen localhost:8080"

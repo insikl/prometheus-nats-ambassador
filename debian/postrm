@@ -1,0 +1,13 @@
+#!/bin/sh
+# postrm script for prometheus-fping-exporter
+# Script executed after the package is removed.
+
+set -e
+
+case "$1" in
+  purge)
+    :
+	;;
+esac
+
+#DEBHELPER#
