@@ -1,0 +1,5 @@
+prometheus-nats-ambassador (0.1) unstable; urgency=medium
+
+  * Upstream initial unstable release
+
+ -- Joshua M. Boniface <joshua@boniface.me>  Wed, 21 Feb 2023 15:14:33 -0500

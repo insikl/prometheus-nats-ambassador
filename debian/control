@@ -1,0 +1,17 @@
+Source: prometheus-nats-ambassador
+Maintainer: Joshua M. Boniface <joshua@boniface.me>
+Section: net
+Priority: optional
+Build-Depends: debhelper-compat (= 13),
+               dh-sequence-golang,
+               golang-any (>= 2:1.16~),
+Standards-Version: 4.6.2
+Homepage: https://github.com/insikl/prometheus-nats-ambassador
+Vcs-Browser: https://github.com/insikl/prometheus-nats-ambassador
+Vcs-Git: https://github.com/insikl/prometheus-nats-ambassador.git
+Rules-Requires-Root: no
+XS-Go-Import-Path: prometheus-nats-ambassador
+
+Package: prometheus-nats-ambassador
+Architecture: any
+Description: Ambassador microservice for Prometheus to use NATS2 message bus

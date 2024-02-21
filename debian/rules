@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+export DH_VERBOSE=1
+export CGO_ENABLED=0
+
+%:
+	dh $@ --buildsystem=golang --builddir=$(CURDIR)/build
+
+override_dh_auto_build:
+	make
+	mkdir -p build/bin && mv bin/nats_ambassador build/bin/prometheus-nats-ambassador
+
+override_dh_auto_test:
+
+override_dh_golang:
+
+override_dh_builddeb:
+	dh_builddeb -- -Zgzip -z9
