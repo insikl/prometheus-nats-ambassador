@@ -1,5 +1,5 @@
 [Unit]
-Description=MATS ambassador microservice for Prometheus
+Description=NATS ambassador microservice for Prometheus
 
 [Service]
 Restart=on-failure
