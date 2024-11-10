@@ -1,3 +1,9 @@
+prometheus-nats-ambassador (0.1.1) unstable; urgency=medium
+
+  * Typo fix on Debian systemd unit description
+
+ -- Insik Lee <lee.insik@outlook.com>  Thur, 8 May 2024 23:33:33 -0400
+
 prometheus-nats-ambassador (0.1) unstable; urgency=medium
 
   * Upstream initial unstable release
