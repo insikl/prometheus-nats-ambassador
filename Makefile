@@ -15,9 +15,10 @@ export GOBIN  := $(BASEWD)/bin
 
 .PHONY: build
 build:
+	@$(GO) mod tidy
 	@for app in $(APPS) ; do \
 		cd $(BASEWD)/cmd/$$app/ && \
-		go install -v -ldflags "-X main.BuildName=$$app \
+		$(GO) install -v -ldflags "-X main.BuildName=$$app \
 			-X main.BuildUser=$(USER)@$(shell hostname) \
 			-X main.BuildDate=$(shell date +%FT%T%Z) \
 			-X main.BuildBranch=$(shell git rev-parse --abbrev-ref HEAD) \
@@ -31,7 +32,7 @@ build:
 test:
 	@for app in $(APPS) ; do \
 		cd $(BASEWD)/cmd/$$app/ && \
-		go test -v ;\
+		$(GO) test -v ;\
 	done
 
 .PHONY: clean
