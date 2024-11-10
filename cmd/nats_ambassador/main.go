@@ -34,7 +34,7 @@ import (
 
 // Build information.
 const (
-	BuildVersion = "0.1.0"
+	BuildVersion = "0.1.1"
 )
 
 // Build information populated at build-time.
@@ -232,28 +232,29 @@ func main() {
 	// n our jsonFile
 	// subscriptionRules := "subscriptions.json"
 	var exporterSub []Subscription
-	if _, err := os.Stat(*natsSubs); err == nil {
-		log.Printf("Subscription file found [%v]\n", *natsSubs)
-		jsonFile, err := os.Open(*natsSubs)
-		// if we os.Open returns an error then handle it
-		if err != nil {
-			log.Fatalln(err)
-		}
-		log.Printf("Successfully Opened [%v]", *natsSubs)
+	_, err := os.Stat(*natsSubs)
 
-		// Read files
-		byteValue, readErr := io.ReadAll(jsonFile)
-		if readErr != nil {
-			log.Fatalln(readErr)
-		}
-		jsonFile.Close()
-
-		// Init variable to put byte data in and place in pointer
-		if err := json.Unmarshal(byteValue, &exporterSub); err != nil {
-			log.Fatalln(err)
-		}
-	} else {
+	if err != nil {
 		log.Printf("No subscription file skipping any subscriptions\n")
+	}
+
+	log.Printf("Subscription file found [%v]\n", *natsSubs)
+	jsonFile, err := os.Open(*natsSubs)
+	// if we os.Open returns an error then handle it
+	if err != nil {
+		log.Fatalln(err)
+	}
+	log.Printf("Successfully Opened [%v]", *natsSubs)
+
+	// Read files and and create `exporterSub` object.
+	byteValue, err := io.ReadAll(jsonFile)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	jsonFile.Close()
+	err = json.Unmarshal(byteValue, &exporterSub)
+	if err != nil {
+		log.Fatalln(err)
 	}
 
 	// Connect Options.
