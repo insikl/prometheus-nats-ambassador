@@ -380,8 +380,8 @@ func (pubsub *ProxyConn) metricsHandler(w http.ResponseWriter, r *http.Request) 
 	if hostReq == "" {
 		// https://prometheus.io/docs/instrumenting/writing_exporters/#failed-scrapes
 		// https://go.dev/src/net/http/status.go
-		w.WriteHeader(http.StatusBadGateway)
 		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusBadGateway)
 		w.Write([]byte(`<html>
 		    <head><title>Prometheus NATS Ambassador</title></head>
 			<body><b>ERROR: missing Host parameter</b></body>
