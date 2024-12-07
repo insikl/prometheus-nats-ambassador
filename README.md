@@ -131,15 +131,15 @@ Below is a simple configuration with a per-proxy configuration for the
 `prometheus.yml` file used by Prometheus server/collector. The metrics path
 used by the Prometheus NATS Ambassador is `/proxy`.
 
-> NOTE: If you want to use TLS on the `proxy_url` then put `nats_ambassador`
-> behind a reverse proxy.
+> NOTE: If you want to use TLS on the `proxy_url` then put the Prometheus
+> NATS Ambassador behind a reverse proxy.
 
 ```yaml
   # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#scrape_config
   # Each job name must be unique
   - job_name: "nats_node_targets"
     # Set metrics pull path for NATS Ambassador running locally
-    proxy_url: http://localhost:8080/
+    proxy_url: http://localhost:8181/
     metrics_path: /proxy
 
     static_configs:
@@ -152,7 +152,7 @@ used by the Prometheus NATS Ambassador is `/proxy`.
 
   - job_name: "nats_node_remote_tls"
     # Set metrics pull path for NATS Ambassador via TLS behind a reverse proxy
-    proxy_url: https://remotes.example.com:8080/
+    proxy_url: https://remotes.example.com:8181/
     metrics_path: /proxy
 
     static_configs:
@@ -179,7 +179,7 @@ with what can be set.
   - job_name: "nats_node_exporter_service_discovery"
 
     # Set metrics pull path for NATS Ambassador
-    proxy_url: http://localhost:8080/
+    proxy_url: http://localhost:8181/
     metrics_path: /proxy
 
     file_sd_configs:
@@ -280,7 +280,7 @@ match what was set above for subject base and format.
     "pubsubname": "node_exporter",
     "topic": "io.prometheus.exporter.target2_example_com.9100",
     "route": {
-      "default": "http://target1.localnet:9100/metrics",
+      "default": "http://target2.localnet:9100/metrics",
       "rules": []
     }
   }
@@ -302,10 +302,10 @@ that can be started up as, with or without a `subscriptions.json` file.
       exporter response.
  - Usage:
    ```sh
-   nats_ambassador -creds /nats/cred/file/user.creds \
+   prometheus-nats-ambassador -creds /nats/cred/file/user.creds \
      -urls nats://nats.example.com:4222 \
      -subs /sub/file/loc/subscriptions.json \
-     -listen localhost:8080
+     -listen localhost:8181
    ```
 
 ## Method 2 (Scraper only)
@@ -315,9 +315,9 @@ that can be started up as, with or without a `subscriptions.json` file.
       scraper.
  - Usage:
    ```sh
-   nats_ambassador -creds /nats/cred/file/user.creds \
+   prometheus-nats-ambassador -creds /nats/cred/file/user.creds \
      -urls nats://nats.example.com:4222 \
-     -listen localhost:8080
+     -listen localhost:8181
    ```
 
 Tests - *TODO*
@@ -335,3 +335,4 @@ For now only testing if version is proper semver.
 [^nats-naming]: https://github.com/nats-io/nats-architecture-and-design/blob/main/adr/ADR-6.md
 [^prom-ports]: https://github.com/prometheus/prometheus/wiki/Default-port-allocations
 [^per-target-proxy]: https://github.com/prometheus/prometheus/issues/9074#issuecomment-887616786
+
