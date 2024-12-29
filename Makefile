@@ -28,6 +28,14 @@ build:
 		";\
 	done
 
+.PHONY: modup
+modup:
+	@for app in $(APPS) ; do \
+		cd $(BASEWD)/cmd/$$app/ && \
+		$(GO) get -u ;\
+	done
+	@$(GO) mod tidy
+
 .PHONY: test
 test:
 	@for app in $(APPS) ; do \
