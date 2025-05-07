@@ -30,6 +30,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/insikl/prometheus-nats-ambassador/internal/models"
 )
 
 // Build information.
@@ -70,24 +72,6 @@ func usage() {
 func showUsageAndExit(exitcode int) {
 	usage()
 	os.Exit(exitcode)
-}
-
-// Struct to represent the JSON data
-type Subscription struct {
-	PubSubName string            `json:"pubsubname"`
-	Topic      string            `json:"topic"`
-	Metadata   map[string]string `json:"metadata,omitempty"`
-	Route      PubSubRoute
-}
-
-type PubSubRoute struct {
-	Rules   []RouteRule `json:"rules,omitempty"`
-	Default string      `json:"default,omitempty"`
-}
-
-type RouteRule struct {
-	Match string `json:"match"`
-	Path  string `json:"path"`
 }
 
 // Handler/Context for NATS connection sharing to functions
@@ -231,7 +215,7 @@ func main() {
 	// Open subscription config file
 	// n our jsonFile
 	// subscriptionRules := "subscriptions.json"
-	var exporterSub []Subscription
+	var exporterSub []models.Subscription
 	_, err := os.Stat(*natsSubs)
 
 	if err != nil {
