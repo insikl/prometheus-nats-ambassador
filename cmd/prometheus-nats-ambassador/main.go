@@ -34,7 +34,7 @@ import (
 
 // Build information.
 const (
-	BuildVersion = "0.1.3"
+	BuildVersion = "0.1.4"
 )
 
 // Build information populated at build-time.
@@ -401,7 +401,7 @@ func (pubsub *ProxyConn) metricsHandler(w http.ResponseWriter, r *http.Request) 
 
 	// Check if we couldn't split, set `hostName` to `Host: <...>` and default
 	// to port `80`.
-	if hostName == "" && hostPort == "" && err != nil {
+	if hostName == "" && hostPort == "" {
 		hostName = hostReq
 		hostPort = string(rune(80))
 	}
