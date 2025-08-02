@@ -14,5 +14,13 @@
       "default": "http://www.msftconnecttest.com/connecttest.txt",
       "rules": []
     }
+  },
+  {
+    "pubsubname": "post.remote",
+    "topic": "io.prometheus.exporter.remote",
+    "route": {
+      "default": "http://localhost:8428/api/v1/write",
+      "rules": []
+    }
   }
 ]
