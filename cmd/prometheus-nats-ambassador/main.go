@@ -179,6 +179,12 @@ func main() {
 		"Show version",
 	)
 
+	var showDebug = flag.Bool(
+		"d",
+		false,
+		"Show debug output",
+	)
+
 	flag.Usage = usage
 	flag.Parse()
 
@@ -289,6 +295,14 @@ func main() {
 		_, err := nc.Subscribe(
 			exporterSub[i].Topic,
 			func(msg *nats.Msg) {
+				if *showDebug {
+					log.Printf(
+						"DEBUG incoming message for relay on [%v] to endpoint [%v]\n",
+						msg.Subject,
+						topicMap[msg.Subject],
+					)
+				}
+
 				// For pubsubname that starts with `post.` relay for remote
 				// write. Otherwise use the request/reply method
 				if strings.HasPrefix(exporterSub[i].PubSubName, "post.") {
@@ -315,6 +329,8 @@ func main() {
 		)
 
 		if err != nil {
+			log.Printf("ERROR: %v\n", err)
+		} else {
 			log.Printf(
 				"INFO subscribed to [%v], with endpoint [%v]\n",
 				exporterSub[i].Topic,
