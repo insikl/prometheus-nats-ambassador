@@ -182,7 +182,7 @@ func main() {
 
 	var enableDebug = flag.Bool(
 		"d",
-		false,
+		showDebug,
 		"Show debug output",
 	)
 
