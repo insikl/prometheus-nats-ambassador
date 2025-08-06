@@ -55,6 +55,7 @@ var (
 	//  topicBase + host + port
 	topicBase = "io.prometheus.exporter."
 	topicFmt  = "mod"
+	showDebug = false
 )
 
 func usage() {
@@ -179,7 +180,7 @@ func main() {
 		"Show version",
 	)
 
-	var showDebug = flag.Bool(
+	var enableDebug = flag.Bool(
 		"d",
 		false,
 		"Show debug output",
@@ -212,6 +213,9 @@ func main() {
 	}
 	if topicFmt != *baseFmt {
 		topicFmt = *baseFmt
+	}
+	if *enableDebug {
+		showDebug = true
 	}
 
 	// Open subscription config file
@@ -295,7 +299,7 @@ func main() {
 		_, err := nc.Subscribe(
 			exporterSub[i].Topic,
 			func(msg *nats.Msg) {
-				if *showDebug {
+				if showDebug {
 					log.Printf(
 						"DEBUG incoming message for relay on [%v] to endpoint [%v]\n",
 						msg.Subject,
