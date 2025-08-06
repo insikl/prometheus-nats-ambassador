@@ -24,7 +24,7 @@ import (
 )
 
 // Read data for remote writer
-func (pubsub *ProxyConn) remoteWriteHandler(w http.ResponseWriter, r *http.Request) {
+func (pubsub *ProxyConn) RemoteWriteHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Only POST method is supported", http.StatusMethodNotAllowed)
 		return
@@ -103,7 +103,7 @@ func (pubsub *ProxyConn) remoteWriteHandler(w http.ResponseWriter, r *http.Reque
 // User-Agent: <name & version of the sender>
 // X-Prometheus-Remote-Write-Version: 0.1.0
 // func relayPrometheusRemoteWrite(compressedData []byte, w http.ResponseWriter, r *http.Request) error {
-func relayPrometheusRemoteWrite(
+func RelayPrometheusRemoteWrite(
 	topic string,
 	remoteWriteURL string,
 	compressedData []byte,

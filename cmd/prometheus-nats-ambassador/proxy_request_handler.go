@@ -27,7 +27,7 @@ import (
 )
 
 // HTTP handler function for `/proxy` endpoint
-func (pubsub *ProxyConn) proxyRequestHandler(w http.ResponseWriter, r *http.Request) {
+func (pubsub *ProxyConn) ProxyRequestHandler(w http.ResponseWriter, r *http.Request) {
 	// Start timer
 	start := time.Now()
 
@@ -136,7 +136,7 @@ func (pubsub *ProxyConn) proxyRequestHandler(w http.ResponseWriter, r *http.Requ
 }
 
 // NATS listen subscriber
-func proxyPrometheusRequest(topic, urlHost, urlParam string) (string, error) {
+func ProxyPrometheusRequest(topic, urlHost, urlParam string) (string, error) {
 	if topic == "" {
 		proxyReply.With(prometheus.Labels{
 			"subject": topic,

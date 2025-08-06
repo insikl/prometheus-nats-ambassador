@@ -310,7 +310,7 @@ func main() {
 				// For pubsubname that starts with `post.` relay for remote
 				// write. Otherwise use the request/reply method
 				if strings.HasPrefix(exporterSub[i].PubSubName, "post.") {
-					_, err := relayPrometheusRemoteWrite(
+					_, err := RelayPrometheusRemoteWrite(
 						msg.Subject,
 						topicMap[msg.Subject],
 						msg.Data,
@@ -319,7 +319,7 @@ func main() {
 						log.Printf("Error on response: [%v]\n", err)
 					}
 				} else {
-					reply, err := proxyPrometheusRequest(
+					reply, err := ProxyPrometheusRequest(
 						msg.Subject,
 						topicMap[msg.Subject],
 						string(msg.Data),
@@ -345,8 +345,8 @@ func main() {
 
 	// Prepare HTTP handlers
 	http.Handle("/metrics", promhttp.Handler())
-	http.HandleFunc("/proxy", pubsubConn.proxyRequestHandler)
-	http.HandleFunc("/api/v1/write", pubsubConn.remoteWriteHandler)
+	http.HandleFunc("/proxy", pubsubConn.ProxyRequestHandler)
+	http.HandleFunc("/api/v1/write", pubsubConn.RemoteWriteHandler)
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
 
