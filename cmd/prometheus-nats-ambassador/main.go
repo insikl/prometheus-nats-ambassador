@@ -338,9 +338,10 @@ func main() {
 		}
 	}
 
-	//
-	// For pubsubname that starts with `post.` relay for remote
-	// write. Otherwise use the request/reply method
+	// Check if `-remotewrite` is set and use the `subjbase` to subscribe with
+	// this is to avoid using the subscription file used in the req/reply method
+	// that did dynamic creation of NATS subjects. In the remote write scenario
+	// there is only one subscription that happens on the specified base target
 	if topicRemoteWrite != "" {
 		_, err := nc.Subscribe(
 			topicBase,
