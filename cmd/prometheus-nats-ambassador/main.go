@@ -13,17 +13,12 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
-	"net/url"
 	"os"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -36,7 +31,7 @@ import (
 
 // Build information.
 const (
-	BuildVersion = "0.1.4"
+	BuildVersion = "0.2.0"
 )
 
 // Build information populated at build-time.
@@ -59,6 +54,9 @@ var (
 	//  topicBase + host + port
 	topicBase = "io.prometheus.exporter."
 	topicFmt  = "mod"
+
+	topicRemoteWrite = ""
+	showDebug        = false
 )
 
 func usage() {
@@ -157,6 +155,11 @@ func main() {
 		"subscriptions.json",
 		"Subscriptions file",
 	)
+	var remoteWrite = flag.String(
+		"remotewrite",
+		topicRemoteWrite,
+		"Remote write endpoint, cannot be used with `-subs`",
+	)
 	var basePub = flag.String(
 		"subjbase",
 		topicBase,
@@ -181,6 +184,11 @@ func main() {
 		"v",
 		false,
 		"Show version",
+	)
+	var enableDebug = flag.Bool(
+		"d",
+		showDebug,
+		"Show debug output",
 	)
 
 	flag.Usage = usage
@@ -211,6 +219,12 @@ func main() {
 	if topicFmt != *baseFmt {
 		topicFmt = *baseFmt
 	}
+	if *remoteWrite != "" {
+		topicRemoteWrite = *remoteWrite
+	}
+	if *enableDebug {
+		showDebug = true
+	}
 
 	// Open subscription config file
 	// n our jsonFile
@@ -220,25 +234,25 @@ func main() {
 
 	if err != nil {
 		log.Printf("No subscription file skipping any subscriptions\n")
-	}
+	} else {
+		log.Printf("Subscription file found [%v]\n", *natsSubs)
+		jsonFile, err := os.Open(*natsSubs)
+		// if we os.Open returns an error then handle it
+		if err != nil {
+			log.Fatalln(err)
+		}
+		log.Printf("Successfully Opened [%v]", *natsSubs)
 
-	log.Printf("Subscription file found [%v]\n", *natsSubs)
-	jsonFile, err := os.Open(*natsSubs)
-	// if we os.Open returns an error then handle it
-	if err != nil {
-		log.Fatalln(err)
-	}
-	log.Printf("Successfully Opened [%v]", *natsSubs)
-
-	// Read files and and create `exporterSub` object.
-	byteValue, err := io.ReadAll(jsonFile)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	jsonFile.Close()
-	err = json.Unmarshal(byteValue, &exporterSub)
-	if err != nil {
-		log.Fatalln(err)
+		// Read files and and create `exporterSub` object.
+		byteValue, err := io.ReadAll(jsonFile)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		jsonFile.Close()
+		err = json.Unmarshal(byteValue, &exporterSub)
+		if err != nil {
+			log.Fatalln(err)
+		}
 	}
 
 	// Connect Options.
@@ -288,11 +302,20 @@ func main() {
 
 	// Get an array of subscriptions
 	for i := 0; i < len(exporterSub); i++ {
+		// Get the topic we're going to subscribe to
 		topicMap[exporterSub[i].Topic] = exporterSub[i].Route.Default
 		_, err := nc.Subscribe(
 			exporterSub[i].Topic,
 			func(msg *nats.Msg) {
-				reply, err := metrics(
+				if showDebug {
+					log.Printf(
+						"DEBUG incoming message for relay on [%v] to endpoint [%v]\n",
+						msg.Subject,
+						topicMap[msg.Subject],
+					)
+				}
+
+				reply, err := ProxyPrometheusRequest(
 					msg.Subject,
 					topicMap[msg.Subject],
 					string(msg.Data),
@@ -305,6 +328,8 @@ func main() {
 		)
 
 		if err != nil {
+			log.Printf("ERROR: %v\n", err)
+		} else {
 			log.Printf(
 				"INFO subscribed to [%v], with endpoint [%v]\n",
 				exporterSub[i].Topic,
@@ -313,9 +338,48 @@ func main() {
 		}
 	}
 
+	// Check if `-remotewrite` is set and use the `subjbase` to subscribe with
+	// this is to avoid using the subscription file used in the req/reply method
+	// that did dynamic creation of NATS subjects. In the remote write scenario
+	// there is only one subscription that happens on the specified base target
+	if topicRemoteWrite != "" {
+		_, err := nc.Subscribe(
+			topicBase,
+			func(msg *nats.Msg) {
+				if showDebug {
+					log.Printf(
+						"DEBUG incoming message for relay on [%v] to endpoint [%v]\n",
+						msg.Subject,
+						topicRemoteWrite,
+					)
+				}
+
+				_, err := RelayPrometheusRemoteWrite(
+					msg.Subject,
+					topicRemoteWrite,
+					msg.Data,
+				)
+				if err != nil {
+					log.Printf("Error on response: [%v]\n", err)
+				}
+			},
+		)
+
+		if err != nil {
+			log.Printf("ERROR: %v\n", err)
+		} else {
+			log.Printf(
+				"INFO subscribed to [%v], with endpoint [%v]\n",
+				topicBase,
+				topicRemoteWrite,
+			)
+		}
+	}
+
 	// Prepare HTTP handlers
 	http.Handle("/metrics", promhttp.Handler())
-	http.HandleFunc("/proxy", pubsubConn.metricsHandler)
+	http.HandleFunc("/proxy", pubsubConn.ProxyRequestHandler)
+	http.HandleFunc("/api/v1/write", pubsubConn.RemoteWriteHandler)
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
 
@@ -335,175 +399,4 @@ func setupConnOptions(opts []nats.Option) []nats.Option {
 		log.Fatalf("Exiting: %v", nc.LastError())
 	}))
 	return opts
-}
-
-func (pubsub *ProxyConn) metricsHandler(w http.ResponseWriter, r *http.Request) {
-	// Start timer
-	start := time.Now()
-
-	// https://go.dev/ref/spec#Expression_switches
-	hostReqRaw := r.Header.Get("x-forwarded-host")
-	switch hostReqRaw {
-	case "":
-		hostReqRaw = r.Host
-	default:
-		log.Fatalln("No host defined, unable to continue")
-	}
-
-	promScrapeTimeoutRaw, err := strconv.Atoi(r.Header.Get("x-prometheus-scrape-timeout-seconds"))
-	if err != nil {
-		// Unable to convert string to int, default to 10 seconds.
-		promScrapeTimeoutRaw = 10
-	}
-	// Set NATS timeout on request
-	// https://pkg.go.dev/time#Second
-	promScrapeTimeout := time.Duration(promScrapeTimeoutRaw) * time.Second
-
-	// Normalize hostname to lowercase
-	hostReq := strings.ToLower(hostReqRaw)
-
-	if hostReq == "" {
-		// https://prometheus.io/docs/instrumenting/writing_exporters/#failed-scrapes
-		// https://go.dev/src/net/http/status.go
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusBadGateway)
-		w.Write([]byte(`<html>
-		    <head><title>Prometheus NATS Ambassador</title></head>
-			<body><b>ERROR: missing Host parameter</b></body>
-			</html>`))
-		return
-	}
-
-	// Get request and findout NATS subject we'll send requests to
-	hostName, hostPort, err := net.SplitHostPort(hostReq)
-	if err != nil {
-		// https://go.dev/src/net/http/status.go
-		w.WriteHeader(http.StatusBadGateway)
-		log.Println(err)
-		return
-	}
-
-	// Check if we couldn't split, set `hostName` to `Host: <...>` and default
-	// to port `80`.
-	if hostName == "" && hostPort == "" {
-		hostName = hostReq
-		hostPort = string(rune(80))
-	}
-
-	// Normalize hostname, create array of hostname in forward and reverse.
-	hostFwd := strings.Split(hostName, ".")
-
-	// Reverse hostname
-	var hostRev []string
-	for _, n := range hostFwd {
-		hostRev = append([]string{n}, hostRev...)
-	}
-
-	// var subFormat string
-	switch topicFmt {
-	case "rev":
-		hostName = strings.Join(hostRev, ".")
-	case "fwd":
-		hostName = strings.Join(hostFwd, ".")
-	default:
-		hostName = strings.ReplaceAll(hostName, ".", "_")
-	}
-
-	// Build NATS subject
-	subj := topicBase + hostName + "." + hostPort
-
-	// https://pkg.go.dev/net/http#Request.URL
-	q := r.URL.Query()
-	q.Add("x-prometheus-scrape-timeout-seconds", strconv.Itoa(promScrapeTimeoutRaw))
-	r.URL.RawQuery = q.Encode()
-	payload := []byte(r.URL.RawQuery)
-	msg, err := pubsub.nc.Request(subj, payload, promScrapeTimeout)
-
-	if err != nil {
-		if pubsub.nc.LastError() != nil {
-			log.Fatalf("FATAL: %v last error for request\n", pubsub.nc.LastError())
-		}
-		// https://go.dev/src/net/http/status.go
-		w.WriteHeader(http.StatusServiceUnavailable)
-		log.Printf("ERROR: %v on subject [%v], %v\n", err, subj, time.Since(start))
-
-		// Increase counter by one
-		proxyRequest.With(prometheus.Labels{
-			"subject": subj,
-			"code":    "503",
-		}).Inc()
-		return
-	}
-
-	// Increase counter by one
-	proxyRequest.With(prometheus.Labels{
-		"subject": subj,
-		"code":    "200",
-	}).Inc()
-
-	w.Header().Set("Content-Type", "text/plain")
-	w.Write(msg.Data)
-}
-
-// NATS listen subscriber
-func metrics(topic, urlHost, urlParam string) (string, error) {
-	if topic == "" {
-		proxyReply.With(prometheus.Labels{
-			"subject": topic,
-			"code":    "400",
-		}).Inc()
-		return "", errors.New("400 Bad Request no topic")
-	}
-
-	// Parse body of NATS message which is expected to be a query string
-	p, _ := url.ParseQuery(urlParam)
-
-	// Look for Prometheus scrape timeout in the query string which gets posted
-	// as the body of the NATS message. If not found default to 10 seconds.
-	timeoutScrape, err := strconv.Atoi(p.Get("x-prometheus-scrape-timeout-seconds"))
-	if err != nil {
-		timeoutScrape = 10
-	}
-
-	// Remove and rebuild query, even if `urlParam` is blank, not a big deal if
-	// URL ends with a `?`
-	p.Del("x-prometheus-scrape-timeout-seconds")
-	urlParam = p.Encode()
-	urlReq := urlHost + "?" + urlParam
-
-	// Prepare rull URL request to pull from subscription rules
-	req, err := http.NewRequest("GET", urlReq, nil)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	// Set any headers and timeout, understood there could be an issue with the
-	// timeout as the same value is set in multiple places and weird race
-	// conditions can happen. HOWEVER, if an exporter is always close to max
-	// scrape timeout, that timeout should be increased on the scrapper.
-	req.Header.Set("Content-Type", "text/plain")
-	client := http.Client{
-		Timeout: time.Duration(timeoutScrape) * time.Second,
-	}
-	resp, err := client.Do(req)
-
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	resBody, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	// Convert the byte body to type string
-	bodyString := string(resBody)
-
-	proxyReply.With(prometheus.Labels{
-		"subject": topic,
-		"code":    "200",
-	}).Inc()
-
-	return bodyString, nil
 }
