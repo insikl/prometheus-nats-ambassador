@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2025-08-06
+### Added
+
+- new CLI option `-remotewrite` for remote write URL
+- new CLI option `-d` to show debug output logging
+
+### Changed
+- can omit a subscription file to properly skip
+- subscription file should not be used with `-remotewrite` option
+- minor version bump on features plus module upgrades
+
+### Removed
+- nil
+
 ## [0.1.3] - 2024-12-29
 ### Added
 - new `make modup` command to update module dependancies
