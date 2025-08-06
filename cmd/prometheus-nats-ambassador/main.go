@@ -226,25 +226,25 @@ func main() {
 
 	if err != nil {
 		log.Printf("No subscription file skipping any subscriptions\n")
-	}
+	} else {
+		log.Printf("Subscription file found [%v]\n", *natsSubs)
+		jsonFile, err := os.Open(*natsSubs)
+		// if we os.Open returns an error then handle it
+		if err != nil {
+			log.Fatalln(err)
+		}
+		log.Printf("Successfully Opened [%v]", *natsSubs)
 
-	log.Printf("Subscription file found [%v]\n", *natsSubs)
-	jsonFile, err := os.Open(*natsSubs)
-	// if we os.Open returns an error then handle it
-	if err != nil {
-		log.Fatalln(err)
-	}
-	log.Printf("Successfully Opened [%v]", *natsSubs)
-
-	// Read files and and create `exporterSub` object.
-	byteValue, err := io.ReadAll(jsonFile)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	jsonFile.Close()
-	err = json.Unmarshal(byteValue, &exporterSub)
-	if err != nil {
-		log.Fatalln(err)
+		// Read files and and create `exporterSub` object.
+		byteValue, err := io.ReadAll(jsonFile)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		jsonFile.Close()
+		err = json.Unmarshal(byteValue, &exporterSub)
+		if err != nil {
+			log.Fatalln(err)
+		}
 	}
 
 	// Connect Options.
