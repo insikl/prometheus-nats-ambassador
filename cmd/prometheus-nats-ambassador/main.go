@@ -19,7 +19,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -55,7 +54,9 @@ var (
 	//  topicBase + host + port
 	topicBase = "io.prometheus.exporter."
 	topicFmt  = "mod"
-	showDebug = false
+
+	topicRemoteWrite = ""
+	showDebug        = false
 )
 
 func usage() {
@@ -154,6 +155,11 @@ func main() {
 		"subscriptions.json",
 		"Subscriptions file",
 	)
+	var remoteWrite = flag.String(
+		"remotewrite",
+		topicRemoteWrite,
+		"Remote write endpoint, cannot be used with `-subs`",
+	)
 	var basePub = flag.String(
 		"subjbase",
 		topicBase,
@@ -179,7 +185,6 @@ func main() {
 		false,
 		"Show version",
 	)
-
 	var enableDebug = flag.Bool(
 		"d",
 		showDebug,
@@ -213,6 +218,9 @@ func main() {
 	}
 	if topicFmt != *baseFmt {
 		topicFmt = *baseFmt
+	}
+	if *remoteWrite != "" {
+		topicRemoteWrite = *remoteWrite
 	}
 	if *enableDebug {
 		showDebug = true
@@ -307,28 +315,15 @@ func main() {
 					)
 				}
 
-				// For pubsubname that starts with `post.` relay for remote
-				// write. Otherwise use the request/reply method
-				if strings.HasPrefix(exporterSub[i].PubSubName, "post.") {
-					_, err := RelayPrometheusRemoteWrite(
-						msg.Subject,
-						topicMap[msg.Subject],
-						msg.Data,
-					)
-					if err != nil {
-						log.Printf("Error on response: [%v]\n", err)
-					}
-				} else {
-					reply, err := ProxyPrometheusRequest(
-						msg.Subject,
-						topicMap[msg.Subject],
-						string(msg.Data),
-					)
-					if err != nil {
-						log.Printf("Error on response: [%v]\n", err)
-					}
-					msg.Respond([]byte(reply))
+				reply, err := ProxyPrometheusRequest(
+					msg.Subject,
+					topicMap[msg.Subject],
+					string(msg.Data),
+				)
+				if err != nil {
+					log.Printf("Error on response: [%v]\n", err)
 				}
+				msg.Respond([]byte(reply))
 			},
 		)
 
@@ -339,6 +334,43 @@ func main() {
 				"INFO subscribed to [%v], with endpoint [%v]\n",
 				exporterSub[i].Topic,
 				exporterSub[i].Route.Default,
+			)
+		}
+	}
+
+	//
+	// For pubsubname that starts with `post.` relay for remote
+	// write. Otherwise use the request/reply method
+	if topicRemoteWrite != "" {
+		_, err := nc.Subscribe(
+			topicBase,
+			func(msg *nats.Msg) {
+				if showDebug {
+					log.Printf(
+						"DEBUG incoming message for relay on [%v] to endpoint [%v]\n",
+						msg.Subject,
+						topicRemoteWrite,
+					)
+				}
+
+				_, err := RelayPrometheusRemoteWrite(
+					msg.Subject,
+					topicRemoteWrite,
+					msg.Data,
+				)
+				if err != nil {
+					log.Printf("Error on response: [%v]\n", err)
+				}
+			},
+		)
+
+		if err != nil {
+			log.Printf("ERROR: %v\n", err)
+		} else {
+			log.Printf(
+				"INFO subscribed to [%v], with endpoint [%v]\n",
+				topicBase,
+				topicRemoteWrite,
 			)
 		}
 	}
