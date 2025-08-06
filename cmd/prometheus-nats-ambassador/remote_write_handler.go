@@ -69,8 +69,13 @@ func (pubsub *ProxyConn) remoteWriteHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	log.Printf("Received Prometheus remote write request (size: %d bytes). Publishing to NATS topic '%s'...",
-		len(compressedData), topicBase)
+	if showDebug {
+		log.Printf(
+			"DEBUG Received Prometheus remote write request (size: %d bytes). Publishing to NATS topic '%s'...",
+			len(compressedData),
+			topicBase,
+		)
+	}
 
 	// Publish the raw compressed data to NATS
 	err = pubsub.nc.Publish(topicBase, compressedData)
@@ -83,7 +88,9 @@ func (pubsub *ProxyConn) remoteWriteHandler(w http.ResponseWriter, r *http.Reque
 	// Acknowledge receipt to Prometheus
 	// 204 No Content is a common success response for remote write
 	w.WriteHeader(http.StatusNoContent)
-	log.Println("Successfully published data to NATS and acknowledged to Prometheus.")
+	if showDebug {
+		log.Println("DEBUG Successfully published data to NATS and acknowledged to Prometheus.")
+	}
 }
 
 // relayPrometheusRemoteWrite forwards the raw compressed data to the remote write endpoint.
@@ -145,6 +152,14 @@ func relayPrometheusRemoteWrite(
 		return "", fmt.Errorf("remote write endpoint returned non-success status: %s (body: %s)", resp.Status, string(responseBody))
 	}
 
-	log.Printf("Successfully relayed %d bytes to %s, status: %s", len(compressedData), remoteWriteURL, resp.Status)
+	if showDebug {
+		log.Printf(
+			"DEBUG Successfully relayed %d bytes to %s, status: %s",
+			len(compressedData),
+			remoteWriteURL,
+			resp.Status,
+		)
+	}
+
 	return "", nil
 }
