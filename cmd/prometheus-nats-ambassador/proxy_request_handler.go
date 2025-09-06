@@ -15,7 +15,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -23,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/insikl/prometheus-nats-ambassador/internal/logger"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -37,7 +37,7 @@ func (pubsub *ProxyConn) ProxyRequestHandler(w http.ResponseWriter, r *http.Requ
 	case "":
 		hostReqRaw = r.Host
 	default:
-		log.Fatalln("No host defined, unable to continue")
+		logger.Fatal("No host defined, unable to continue")
 	}
 
 	promScrapeTimeoutRaw, err := strconv.Atoi(r.Header.Get("x-prometheus-scrape-timeout-seconds"))
@@ -67,9 +67,9 @@ func (pubsub *ProxyConn) ProxyRequestHandler(w http.ResponseWriter, r *http.Requ
 	// Get request and findout NATS subject we'll send requests to
 	hostName, hostPort, err := net.SplitHostPort(hostReq)
 	if err != nil {
+		logger.Error("%v", err)
 		// https://go.dev/src/net/http/status.go
 		w.WriteHeader(http.StatusBadGateway)
-		log.Println(err)
 		return
 	}
 
@@ -111,11 +111,11 @@ func (pubsub *ProxyConn) ProxyRequestHandler(w http.ResponseWriter, r *http.Requ
 
 	if err != nil {
 		if pubsub.nc.LastError() != nil {
-			log.Fatalf("FATAL: %v last error for request\n", pubsub.nc.LastError())
+			logger.Fatal("%v last error for request\n", pubsub.nc.LastError())
 		}
 		// https://go.dev/src/net/http/status.go
 		w.WriteHeader(http.StatusServiceUnavailable)
-		log.Printf("ERROR: %v on subject [%v], %v\n", err, subj, time.Since(start))
+		logger.Error("%v on subject [%v], %v\n", err, subj, time.Since(start))
 
 		// Increase counter by one
 		proxyRequest.With(prometheus.Labels{

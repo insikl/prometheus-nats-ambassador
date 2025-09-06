@@ -26,12 +26,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/insikl/prometheus-nats-ambassador/internal/logger"
 	"github.com/insikl/prometheus-nats-ambassador/internal/models"
 )
 
 // Build information.
 const (
-	BuildVersion = "0.2.0"
+	BuildVersion = "0.2.1"
 )
 
 // Build information populated at build-time.
@@ -158,7 +159,7 @@ func main() {
 	var remoteWrite = flag.String(
 		"remotewrite",
 		topicRemoteWrite,
-		"Remote write endpoint, cannot be used with `-subs`",
+		"Remote write endpoint, cannot be used with '-subs'",
 	)
 	var basePub = flag.String(
 		"subjbase",
@@ -194,6 +195,24 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
+	// override default value for debug if set
+	if *enableDebug {
+		showDebug = true
+	}
+
+	// IMPORTANT: Disable all default flags since our custom logger
+	// now handles formatting the time.
+	log.SetFlags(0)
+
+	// Set debug logging if set
+	if showDebug {
+		// Extra line prints showing the file and line number of the debug log
+		logger.SetLogLevel(logger.DEBUG)
+		logger.Debug("Debug logging enabled")
+	} else {
+		logger.SetLogLevel(logger.INFO)
+	}
+
 	if *showHelp {
 		showUsageAndExit(0)
 	}
@@ -222,36 +241,32 @@ func main() {
 	if *remoteWrite != "" {
 		topicRemoteWrite = *remoteWrite
 	}
-	if *enableDebug {
-		showDebug = true
-	}
 
 	// Open subscription config file
-	// n our jsonFile
 	// subscriptionRules := "subscriptions.json"
 	var exporterSub []models.Subscription
 	_, err := os.Stat(*natsSubs)
 
 	if err != nil {
-		log.Printf("No subscription file skipping any subscriptions\n")
+		logger.Info("No subscription file skipping any subscriptions")
 	} else {
-		log.Printf("Subscription file found [%v]\n", *natsSubs)
+		logger.Info("Subscription file found [%v]\n", *natsSubs)
 		jsonFile, err := os.Open(*natsSubs)
 		// if we os.Open returns an error then handle it
 		if err != nil {
-			log.Fatalln(err)
+			logger.Fatal("%v", err)
 		}
-		log.Printf("Successfully Opened [%v]", *natsSubs)
+		logger.Info("Successfully Opened [%v]", *natsSubs)
 
 		// Read files and and create `exporterSub` object.
 		byteValue, err := io.ReadAll(jsonFile)
 		if err != nil {
-			log.Fatalln(err)
+			logger.Fatal("%v", err)
 		}
 		jsonFile.Close()
 		err = json.Unmarshal(byteValue, &exporterSub)
 		if err != nil {
-			log.Fatalln(err)
+			logger.Fatal("%v", err)
 		}
 	}
 
@@ -291,9 +306,9 @@ func main() {
 	// Connect to NATS
 	nc, err := nats.Connect(*natsUrls, opts...)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("%v", err)
 	}
-	log.Printf("Connection successful to [%v]", string(*natsUrls))
+	logger.Info("Connection successful to [%v]", string(*natsUrls))
 	pubsubConn := ProxyContext(nc)
 
 	// https://go.dev/tour/flowcontrol/12
@@ -308,8 +323,8 @@ func main() {
 			exporterSub[i].Topic,
 			func(msg *nats.Msg) {
 				if showDebug {
-					log.Printf(
-						"DEBUG incoming message for relay on [%v] to endpoint [%v]\n",
+					logger.Debug(
+						"incoming message for relay on [%v] to endpoint [%v]",
 						msg.Subject,
 						topicMap[msg.Subject],
 					)
@@ -321,17 +336,17 @@ func main() {
 					string(msg.Data),
 				)
 				if err != nil {
-					log.Printf("Error on response: [%v]\n", err)
+					logger.Error("Error on response: [%v]", err)
 				}
 				msg.Respond([]byte(reply))
 			},
 		)
 
 		if err != nil {
-			log.Printf("ERROR: %v\n", err)
+			logger.Error("%v", err)
 		} else {
-			log.Printf(
-				"INFO subscribed to [%v], with endpoint [%v]\n",
+			logger.Info(
+				"subscribed to [%v], with endpoint [%v]",
 				exporterSub[i].Topic,
 				exporterSub[i].Route.Default,
 			)
@@ -347,8 +362,8 @@ func main() {
 			topicBase,
 			func(msg *nats.Msg) {
 				if showDebug {
-					log.Printf(
-						"DEBUG incoming message for relay on [%v] to endpoint [%v]\n",
+					logger.Debug(
+						"incoming message for relay on [%v] to endpoint [%v]",
 						msg.Subject,
 						topicRemoteWrite,
 					)
@@ -360,16 +375,16 @@ func main() {
 					msg.Data,
 				)
 				if err != nil {
-					log.Printf("Error on response: [%v]\n", err)
+					logger.Error("Error on response: [%v]", err)
 				}
 			},
 		)
 
 		if err != nil {
-			log.Printf("ERROR: %v\n", err)
+			logger.Error("%v", err)
 		} else {
-			log.Printf(
-				"INFO subscribed to [%v], with endpoint [%v]\n",
+			logger.Info(
+				"subscribed to [%v], with endpoint [%v]",
 				topicBase,
 				topicRemoteWrite,
 			)
@@ -390,13 +405,13 @@ func setupConnOptions(opts []nats.Option) []nats.Option {
 	opts = append(opts, nats.ReconnectWait(reconnectDelay))
 	opts = append(opts, nats.MaxReconnects(int(totalWait/reconnectDelay)))
 	opts = append(opts, nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
-		log.Printf("Disconnected due to:%s, will attempt reconnects for %.0fm", err, totalWait.Minutes())
+		logger.Warn("Disconnected due to:%s, will attempt reconnects for %.0fm", err, totalWait.Minutes())
 	}))
 	opts = append(opts, nats.ReconnectHandler(func(nc *nats.Conn) {
-		log.Printf("Reconnected [%s]", nc.ConnectedUrl())
+		logger.Warn("Reconnected [%s]", nc.ConnectedUrl())
 	}))
 	opts = append(opts, nats.ClosedHandler(func(nc *nats.Conn) {
-		log.Fatalf("Exiting: %v", nc.LastError())
+		logger.Fatal("Exiting: %v", nc.LastError())
 	}))
 	return opts
 }

@@ -15,11 +15,11 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/insikl/prometheus-nats-ambassador/internal/logger"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -40,17 +40,17 @@ func (pubsub *ProxyConn) RemoteWriteHandler(w http.ResponseWriter, r *http.Reque
 	// User-Agent: <name & version of the sender>
 	// X-Prometheus-Remote-Write-Version: 0.1.0
 	if r.Header.Get("Content-Type") != "application/x-protobuf" {
-		log.Printf("Warning: Unexpected Content-Type: %s", r.Header.Get("Content-Type"))
+		logger.Warn("Unexpected Content-Type: %s", r.Header.Get("Content-Type"))
 		http.Error(w, "Content-Type must be application/x-protobuf", http.StatusBadRequest)
 		return
 	}
 	if r.Header.Get("Content-Encoding") != "snappy" {
-		log.Printf("Warning: Unexpected Content-Encoding: %s", r.Header.Get("Content-Encoding"))
+		logger.Warn("Unexpected Content-Encoding: %s", r.Header.Get("Content-Encoding"))
 		http.Error(w, "Content-Encoding must be snappy", http.StatusBadRequest)
 		return
 	}
 	if r.Header.Get("X-Prometheus-Remote-Write-Version") != "0.1.0" {
-		log.Printf("Warning: Unexpected X-Prometheus-Remote-Write-Version: %s", r.Header.Get("X-Prometheus-Remote-Write-Version"))
+		logger.Warn("Unexpected X-Prometheus-Remote-Write-Version: %s", r.Header.Get("X-Prometheus-Remote-Write-Version"))
 		http.Error(w, "X-Prometheus-Remote-Write-Version must be 0.1.0", http.StatusBadRequest)
 		return
 	}
@@ -58,20 +58,20 @@ func (pubsub *ProxyConn) RemoteWriteHandler(w http.ResponseWriter, r *http.Reque
 	// Read the raw binary body directly
 	compressedData, err := io.ReadAll(r.Body)
 	if err != nil {
-		log.Printf("Error reading request body: %v", err)
+		logger.Error("Error reading request body: %v", err)
 		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
 		return
 	}
 
 	if len(compressedData) == 0 {
-		log.Println("Received empty request body.")
+		logger.Error("Received empty request body.")
 		http.Error(w, "Empty request body", http.StatusBadRequest)
 		return
 	}
 
 	if showDebug {
-		log.Printf(
-			"DEBUG Received Prometheus remote write request (size: %d bytes). Publishing to NATS topic '%s'...",
+		logger.Debug(
+			"Received Prometheus remote write request (size: %d bytes). Publishing to NATS topic '%s'...",
 			len(compressedData),
 			topicBase,
 		)
@@ -80,7 +80,7 @@ func (pubsub *ProxyConn) RemoteWriteHandler(w http.ResponseWriter, r *http.Reque
 	// Publish the raw compressed data to NATS
 	err = pubsub.nc.Publish(topicBase, compressedData)
 	if err != nil {
-		log.Printf("Error publishing to NATS: %v", err)
+		logger.Error("Error publishing to NATS: %v", err)
 		http.Error(w, "Failed to publish data to NATS", http.StatusInternalServerError)
 		return
 	}
@@ -89,7 +89,7 @@ func (pubsub *ProxyConn) RemoteWriteHandler(w http.ResponseWriter, r *http.Reque
 	// 204 No Content is a common success response for remote write
 	w.WriteHeader(http.StatusNoContent)
 	if showDebug {
-		log.Println("DEBUG Successfully published data to NATS and acknowledged to Prometheus.")
+		logger.Debug("Successfully published data to NATS and acknowledged to Prometheus.")
 	}
 }
 
@@ -144,7 +144,7 @@ func RelayPrometheusRemoteWrite(
 	// Read the response body in case of an error for better logging
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("Warning: Could not read response body for status %d: %v", resp.StatusCode, err)
+		logger.Warn("Could not read response body for status %d: %v", resp.StatusCode, err)
 	}
 
 	// Check the response status code
@@ -153,8 +153,8 @@ func RelayPrometheusRemoteWrite(
 	}
 
 	if showDebug {
-		log.Printf(
-			"DEBUG Successfully relayed %d bytes to %s, status: %s",
+		logger.Debug(
+			"Successfully relayed %d bytes to %s, status: %s",
 			len(compressedData),
 			remoteWriteURL,
 			resp.Status,
