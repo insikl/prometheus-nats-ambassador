@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2025-09-15
+### Added
+
+- include user agent in HTTP calls
+- add support for detecting compression payload of `snappy` and `zstd`
+
+### Changed
+- nil
+
+### Removed
+- nil
+
 ## [0.2.1] - 2025-08-18
 ### Added
 

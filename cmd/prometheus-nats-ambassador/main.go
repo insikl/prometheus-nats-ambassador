@@ -32,7 +32,7 @@ import (
 
 // Build information.
 const (
-	BuildVersion = "0.2.1"
+	BuildVersion = "0.3.0"
 )
 
 // Build information populated at build-time.
