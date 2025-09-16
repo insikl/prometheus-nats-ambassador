@@ -24,7 +24,8 @@ build:
 			-X main.BuildBranch=$(shell git rev-parse --abbrev-ref HEAD) \
 			-X main.BuildCommit=$(shell git rev-parse HEAD) \
 			-X main.BuildGo=$(GOVERSION) \
-			-X main.BuildPlatform=$(GOHOSTOS)/$(GOHOSTARCH) \
+			-X main.BuildOs=$(GOHOSTOS) \
+			-X main.BuildArch=$(GOHOSTARCH) \
 		";\
 	done
 

@@ -37,13 +37,14 @@ const (
 
 // Build information populated at build-time.
 var (
-	BuildName     string
-	BuildCommit   string
-	BuildBranch   string
-	BuildUser     string
-	BuildDate     string
-	BuildGo       string
-	BuildPlatform string
+	BuildName   string
+	BuildCommit string
+	BuildBranch string
+	BuildUser   string
+	BuildDate   string
+	BuildGo     string
+	BuildOs     string
+	BuildArch   string
 )
 
 // Follows the same structure if pulled from dapr, get a list of topic/subject
@@ -56,6 +57,14 @@ var (
 	topicBase = "io.prometheus.exporter."
 	topicFmt  = "mod"
 
+	// Set useragent
+	// <AppName>/<AppVersion> (Go/<GoVersion>; <OS>; <Arch>)
+	userAgent = fmt.Sprintf("PrometheusNATSAmbassador/%s (Go/%s; %s; %s)",
+		BuildVersion,
+		BuildGo,
+		BuildOs,
+		BuildArch,
+	)
 	topicRemoteWrite = ""
 	showDebug        = false
 )
@@ -227,7 +236,7 @@ func main() {
 		fmt.Printf("  build user:       %v\n", BuildUser)
 		fmt.Printf("  build date:       %v\n", BuildDate)
 		fmt.Printf("  go version:       %v\n", BuildGo)
-		fmt.Printf("  platform:         %v\n", BuildPlatform)
+		fmt.Printf("  platform:         %v/%v\n", BuildOs, BuildArch)
 		os.Exit(0)
 	}
 
