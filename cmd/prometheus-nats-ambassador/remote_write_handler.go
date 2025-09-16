@@ -17,6 +17,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/insikl/prometheus-nats-ambassador/internal/logger"
@@ -39,14 +40,16 @@ func (pubsub *ProxyConn) RemoteWriteHandler(w http.ResponseWriter, r *http.Reque
 	// Content-Type: application/x-protobuf
 	// User-Agent: <name & version of the sender>
 	// X-Prometheus-Remote-Write-Version: 0.1.0
+	enc := strings.ToLower(r.Header.Get("Content-Encoding"))
+	if enc != "snappy" && enc != "zstd" {
+		logger.Warn("Unexpected Content-Encoding: %s", r.Header.Get("Content-Encoding"))
+		http.Error(w, "Content-Encoding must be snappy or zstd", http.StatusBadRequest)
+		return
+	}
+
 	if r.Header.Get("Content-Type") != "application/x-protobuf" {
 		logger.Warn("Unexpected Content-Type: %s", r.Header.Get("Content-Type"))
 		http.Error(w, "Content-Type must be application/x-protobuf", http.StatusBadRequest)
-		return
-	}
-	if r.Header.Get("Content-Encoding") != "snappy" {
-		logger.Warn("Unexpected Content-Encoding: %s", r.Header.Get("Content-Encoding"))
-		http.Error(w, "Content-Encoding must be snappy", http.StatusBadRequest)
 		return
 	}
 	if r.Header.Get("X-Prometheus-Remote-Write-Version") != "0.1.0" {
@@ -77,8 +80,11 @@ func (pubsub *ProxyConn) RemoteWriteHandler(w http.ResponseWriter, r *http.Reque
 		)
 	}
 
+	// Build subject
+	subj := topicBase + ".encoding." + enc
+
 	// Publish the raw compressed data to NATS
-	err = pubsub.nc.Publish(topicBase, compressedData)
+	err = pubsub.nc.Publish(subj, compressedData)
 	if err != nil {
 		logger.Error("Error publishing to NATS: %v", err)
 		http.Error(w, "Failed to publish data to NATS", http.StatusInternalServerError)
@@ -118,12 +124,56 @@ func RelayPrometheusRemoteWrite(
 		return "", fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
+	// NOTE: decode topic to determine the content encoding of the message
+	// Example: io.prometheus.exporter.remote.<site>.encoding.snappy
+	// Example: io.prometheus.exporter.remote.<site>.encoding.zstd
+	parts := strings.Split(topic, ".")
+
+	// NOTE: Require at least 2 parts in NATS subject or exit with an error
+	//       this assumes that any published subject will have at least 2 parts
+	//       even if it doesn't follow the above `*.encoding.<type>`.
+	if len(parts) < 2 {
+		return "", fmt.Errorf("Topic source '%s' does not have enough parts to check.", topic)
+	}
+
+	// Access the last two elements of the slice.
+	encKey := parts[len(parts)-2]
+	encVal := parts[len(parts)-1]
+
+	// Compare the last second to last part.
+	if encKey == "encoding" {
+		logger.Debug("Found encoding '%s' with '%s'", encKey, encVal)
+	} else {
+		// Fallback default mode of assuming content encoding
+		logger.Info("Unknown topic '%s', falling back to '*.encoding.snappy'", topic)
+		encKey = "encoding"
+		encVal = "snappy"
+	}
+
+	switch encVal {
+	case "snappy":
+		logger.Debug("Content encoding '%s' used by Prometheus.", encVal)
+	case "zstd":
+		logger.Debug("Content encoding '%s' used by VictoraMetrics.", encVal)
+	default:
+		// NOTE: This is for older versions of prometheus-nats-ambassador to
+		//       still work with each other below version 0.2.0.
+		logger.Info("Content encoding '%s' unknown, setting 'snappy' as default", encVal)
+		encVal = "snappy"
+	}
+
+	// NOTE: will deprecate defaulting content-encoding and error out in future
+	if encVal != "snappy" {
+		return "", fmt.Errorf("Unknown content encoding type '%s'", encVal)
+	}
+
 	// Set the required Prometheus remote write headers from the input collected
 	// Prometheus Remote Write 1.0 spec
 	// https://prometheus.io/docs/specs/prw/remote_write_spec/#protocol
 	req.Header.Set("Content-Type", "application/x-protobuf")
-	req.Header.Set("Content-Encoding", "snappy")
+	req.Header.Set("Content-Encoding", encVal)
 	req.Header.Set("X-Prometheus-Remote-Write-Version", "0.1.0")
+	req.Header.Set("User-Agent", userAgent)
 
 	// Send the request
 	client := http.Client{
