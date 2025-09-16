@@ -172,6 +172,7 @@ func ProxyPrometheusRequest(topic, urlHost, urlParam string) (string, error) {
 	// conditions can happen. HOWEVER, if an exporter is always close to max
 	// scrape timeout, that timeout should be increased on the scrapper.
 	req.Header.Set("Content-Type", "text/plain")
+	req.Header.Set("User-Agent", userAgent)
 	client := http.Client{
 		Timeout: time.Duration(timeoutScrape) * time.Second,
 	}
