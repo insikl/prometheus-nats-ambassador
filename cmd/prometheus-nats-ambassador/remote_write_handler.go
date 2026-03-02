@@ -145,7 +145,7 @@ func RelayPrometheusRemoteWrite(
 		logger.Debug("Found encoding '%s' with '%s'", encKey, encVal)
 	} else {
 		// Fallback default mode of assuming content encoding
-		logger.Info("Unknown topic '%s', falling back to '*.encoding.snappy'", topic)
+		logger.Debug("Default encoding to 'snappy' for topic '%s'", topic)
 		encKey = "encoding"
 		encVal = "snappy"
 	}
